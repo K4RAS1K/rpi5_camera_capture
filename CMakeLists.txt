@@ -18,12 +18,4 @@ target_link_libraries(camera_capture
     pthread
 )
 
-target_compile_options(camera_capture
-    PRIVATE
-        -O2
-        -Wall
-        -Wextra
-        -pthread
-)
-
-message(STATUS "✅ Сборка: VideoCapture + WebServer")
+message(STATUS "Сборка VideoCapture")
