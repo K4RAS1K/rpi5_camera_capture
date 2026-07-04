@@ -1,10 +1,10 @@
-#include "../include/VideoCapture.hpp"  // ← ТОЛЬКО ЗАГОЛОВОК!
+#include "../include/VideoCapture.hpp"
+#include "../include/CameraManager.hpp"
 #include <iostream>
-#include <chrono>
-#include <thread>
 #include <memory>
 #include <signal.h>
 #include <atomic>
+#include <thread>
 
 std::atomic<bool> running(true);
 
@@ -14,13 +14,13 @@ void signalHandler(int signal) {
 }
 
 int main(int argc, char* argv[]) {
-    
     signal(SIGINT, signalHandler);
     signal(SIGTERM, signalHandler);
     
     int deviceId = (argc > 1) ? std::stoi(argv[1]) : 0;
     
     try {
+        // 1. Создаём захват видео
         auto capture = std::make_shared<VideoCapture>();
         
         if (!capture->open(deviceId)) {
@@ -28,39 +28,38 @@ int main(int argc, char* argv[]) {
             return 1;
         }
         
-        std::cout << "\nИнформация:" << std::endl;
+        std::cout << "\nИнформация о камере:" << std::endl;
         std::cout << "   Ширина: " << capture->getWidth() << std::endl;
         std::cout << "   Высота: " << capture->getHeight() << std::endl;
         std::cout << "   FPS: " << capture->getFPS() << std::endl;
         
-        std::cout << "\n📹 Захват кадров... (Ctrl+C для остановки)\n" << std::endl;
+        // 2. Создаём оркестратор
+        auto manager = std::make_shared<CameraManager>(capture);
         
-        FrameData frame;
-        int count = 0;
-        auto start = std::chrono::steady_clock::now();
-        
-        while (running) {
-            if (!capture->read(frame)) {
-                std::cerr << "Ошибка чтения кадра" << std::endl;
-                break;
-            }
-            
-            count++;
-            
-            if (count % 30 == 0) {
-                auto now = std::chrono::steady_clock::now();
-                auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - start).count();
-                if (elapsed > 0) {
-                    double fps = count / elapsed;
-                    std::cout << "Кадров: " << count << ", FPS: " << fps 
-                              << ", Размер: " << frame.data.size() << " байт" << std::endl;
-                }
-            }
-            
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        // 3. Запускаем захват
+        if (!manager->start()) {
+            std::cerr << "Не удалось запустить захват" << std::endl;
+            return 1;
         }
         
+        while (running) {
+            std::this_thread::sleep_for(std::chrono::seconds(5));
+            
+            auto status = manager->getStatus();
+            auto stats = manager->getStats();
+            
+            std::cout << "\nСтатус:" << std::endl;
+            std::cout << "   Состояние: " << (status.isRunning ? "🟢 Запущена" : "🔴 Остановлена") << std::endl;
+            std::cout << "   Размер: " << status.width << "x" << status.height << std::endl;
+            std::cout << "   FPS: " << stats.currentFPS << std::endl;
+            std::cout << "   Кадров: " << stats.totalFrames << std::endl;
+            std::cout << "   Время работы: " << stats.uptimeSeconds << " сек" << std::endl;
+            std::cout << "   Последний кадр: " << status.lastFrameTime << std::endl;
+        }
+        
+        // 5. Остановка
         std::cout << "\nОстановка..." << std::endl;
+        manager->stop();
         capture->release();
         
         std::cout << "Завершено" << std::endl;

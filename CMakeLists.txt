@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_executable(camera_capture
     src/main.cpp
     src/VideoCapture.cpp
+    src/CameraManager.cpp
 )
 
 target_include_directories(camera_capture
@@ -18,4 +19,12 @@ target_link_libraries(camera_capture
     pthread
 )
 
-message(STATUS "Сборка VideoCapture")
+target_compile_options(camera_capture
+    PRIVATE
+        -O2
+        -Wall
+        -Wextra
+        -pthread
+)
+
+message(STATUS "✅ Сборка: VideoCapture + CameraManager + WebServer")
