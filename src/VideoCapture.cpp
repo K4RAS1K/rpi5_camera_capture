@@ -7,8 +7,9 @@
 #include <cerrno>
 #include <cstring>
 #include <iostream>
+#include <vector>
 
-VideoCapture::VideoCapture() : fd(-1), isOpen(false), width(0), height(0), fps(0.0) {
+VideoCapture::VideoCapture() : fd(-1), isOpen(false), width(0), height(0), fps(0.0), pixelFormat(0) {
     std::cout << "[VideoCapture] Создан" << std::endl;
 }
 
@@ -26,20 +27,20 @@ bool VideoCapture::open(const std::string& path) {
     
     fd = ::open(path.c_str(), O_RDWR);
     if (fd == -1) {
-        std::cerr << "[VideoCapture] ❌ open(): " << strerror(errno) << std::endl;
+        std::cerr << "[VideoCapture] open(): " << strerror(errno) << std::endl;
         return false;
     }
     
     struct v4l2_capability cap;
     if (ioctl(fd, VIDIOC_QUERYCAP, &cap) == -1) {
-        std::cerr << "[VideoCapture] ❌ Не V4L2 устройство" << std::endl;
+        std::cerr << "[VideoCapture] Not V4L2 device" << std::endl;
         close(fd);
         fd = -1;
         return false;
     }
     
-    std::cout << "[VideoCapture]   Устройство: " << (char*)cap.card << std::endl;
-    std::cout << "[VideoCapture]   Драйвер: " << (char*)cap.driver << std::endl;
+    std::cout << "[VideoCapture] Device: " << (char*)cap.card << std::endl;
+    std::cout << "[VideoCapture] Driver: " << (char*)cap.driver << std::endl;
     
     if (!setupFormat()) {
         close(fd);
@@ -52,7 +53,12 @@ bool VideoCapture::open(const std::string& path) {
     if (ioctl(fd, VIDIOC_G_FMT, &fmt) == 0) {
         width = fmt.fmt.pix.width;
         height = fmt.fmt.pix.height;
-        std::cout << "[VideoCapture]   Размер: " << width << "x" << height << std::endl;
+        pixelFormat = fmt.fmt.pix.pixelformat;
+        
+        char fourcc[5] = {0};
+        memcpy(fourcc, &pixelFormat, 4);
+        std::cout << "[VideoCapture] Size: " << width << "x" << height 
+                  << ", Формат: " << fourcc << std::endl;
     }
     
     setupFPS();
@@ -70,7 +76,7 @@ bool VideoCapture::open(const std::string& path) {
     }
     
     isOpen = true;
-    std::cout << "[VideoCapture] ✅ Открыто" << std::endl;
+    std::cout << "[VideoCapture] Open" << std::endl;
     return true;
 }
 
@@ -96,6 +102,7 @@ bool VideoCapture::read(FrameData& frame) {
     buf.memory = V4L2_MEMORY_MMAP;
     
     if (ioctl(fd, VIDIOC_DQBUF, &buf) == -1) {
+        std::cerr << "[VideoCapture] Error DQBUF: " << strerror(errno) << std::endl;
         return false;
     }
     
@@ -108,11 +115,24 @@ bool VideoCapture::read(FrameData& frame) {
     size_t dataSize = buf.bytesused;
     
     if (dataSize > 0) {
-        frame.data.resize(dataSize);
-        memcpy(frame.data.data(), buffer.start, dataSize);
-        frame.width = width;
-        frame.height = height;
-        frame.channels = 3;
+        const uint8_t* rawData = (const uint8_t*)buffer.start;
+        
+        // Если MJPEG — просто копируем сжатые данные
+        if (pixelFormat == V4L2_PIX_FMT_MJPEG || pixelFormat == V4L2_PIX_FMT_JPEG) {
+            frame.data.resize(dataSize);
+            memcpy(frame.data.data(), rawData, dataSize);
+            frame.width = width;
+            frame.height = height;
+            frame.channels = 0;  // 0 = сжатый формат
+            std::cout << "[VideoCapture] MJPEG: " << dataSize << " byte" << std::endl;
+        } else {
+            // Для других форматов — просто копируем как есть
+            frame.data.resize(dataSize);
+            memcpy(frame.data.data(), rawData, dataSize);
+            frame.width = width;
+            frame.height = height;
+            frame.channels = 3;
+        }
     }
     
     ioctl(fd, VIDIOC_QBUF, &buf);
@@ -137,7 +157,7 @@ double VideoCapture::getFPS() const {
 
 void VideoCapture::release() {
     if (fd != -1) {
-        std::cout << "[VideoCapture] Освобождаем ресурсы" << std::endl;
+        std::cout << "[VideoCapture] Freeing up resources" << std::endl;
         stopCapturing();
         freeBuffers();
         close(fd);
@@ -150,27 +170,36 @@ bool VideoCapture::setupFormat() {
     struct v4l2_format fmt;
     fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     
-    uint32_t formats[] = {
+    // Сначала пробуем MJPEG (наша камера его поддерживает)
+    std::vector<uint32_t> formats = {
         V4L2_PIX_FMT_MJPEG,
         V4L2_PIX_FMT_YUYV,
         V4L2_PIX_FMT_RGB24,
         V4L2_PIX_FMT_BGR24
     };
     
+    std::vector<std::pair<int, int>> resolutions = {
+        {640, 480},
+        {320, 240}
+    };
+    
     for (uint32_t pixelformat : formats) {
-        fmt.fmt.pix.pixelformat = pixelformat;
-        fmt.fmt.pix.width = 640;
-        fmt.fmt.pix.height = 480;
-        
-        if (ioctl(fd, VIDIOC_S_FMT, &fmt) == 0) {
-            char fourcc[5] = {0};
-            memcpy(fourcc, &fmt.fmt.pix.pixelformat, 4);
-            std::cout << "[VideoCapture]   Формат: " << fourcc << std::endl;
-            return true;
+        for (auto [w, h] : resolutions) {
+            fmt.fmt.pix.pixelformat = pixelformat;
+            fmt.fmt.pix.width = w;
+            fmt.fmt.pix.height = h;
+            
+            if (ioctl(fd, VIDIOC_S_FMT, &fmt) == 0) {
+                char fourcc[5] = {0};
+                memcpy(fourcc, &fmt.fmt.pix.pixelformat, 4);
+                std::cout << "[VideoCapture]   Формат: " << fourcc 
+                          << " " << fmt.fmt.pix.width << "x" << fmt.fmt.pix.height << std::endl;
+                return true;
+            }
         }
     }
     
-    std::cerr << "[VideoCapture] ❌ Не удалось установить формат" << std::endl;
+    std::cerr << "[VideoCapture] Could not determine the format" << std::endl;
     return false;
 }
 
@@ -183,7 +212,7 @@ void VideoCapture::setupFPS() {
             fps = static_cast<double>(parm.parm.capture.timeperframe.denominator) /
                   parm.parm.capture.timeperframe.numerator;
         }
-        std::cout << "[VideoCapture]   FPS: " << fps << std::endl;
+        std::cout << "[VideoCapture] FPS: " << fps << std::endl;
     } else {
         fps = 30.0;
     }
@@ -196,12 +225,12 @@ bool VideoCapture::initBuffers() {
     req.memory = V4L2_MEMORY_MMAP;
     
     if (ioctl(fd, VIDIOC_REQBUFS, &req) == -1) {
-        std::cerr << "[VideoCapture] ❌ REQBUFS: " << strerror(errno) << std::endl;
+        std::cerr << "[VideoCapture] REQBUFS: " << strerror(errno) << std::endl;
         return false;
     }
     
     if (req.count < 2) {
-        std::cerr << "[VideoCapture] ❌ Мало буферов: " << req.count << std::endl;
+        std::cerr << "[VideoCapture] Low buffer count: " << req.count << std::endl;
         return false;
     }
     
@@ -215,7 +244,7 @@ bool VideoCapture::initBuffers() {
         buf.index = i;
         
         if (ioctl(fd, VIDIOC_QUERYBUF, &buf) == -1) {
-            std::cerr << "[VideoCapture] ❌ QUERYBUF: " << strerror(errno) << std::endl;
+            std::cerr << "[VideoCapture] QUERYBUF: " << strerror(errno) << std::endl;
             return false;
         }
         
@@ -225,12 +254,12 @@ bool VideoCapture::initBuffers() {
                                 MAP_SHARED, fd, buf.m.offset);
         
         if (buffers[i].start == MAP_FAILED) {
-            std::cerr << "[VideoCapture] ❌ mmap: " << strerror(errno) << std::endl;
+            std::cerr << "[VideoCapture] mmap: " << strerror(errno) << std::endl;
             return false;
         }
     }
     
-    std::cout << "[VideoCapture]   Буферов: " << bufferCount << std::endl;
+    std::cout << "[VideoCapture]   buffer: " << bufferCount << std::endl;
     return true;
 }
 
@@ -242,7 +271,7 @@ bool VideoCapture::startCapturing() {
         buf.index = i;
         
         if (ioctl(fd, VIDIOC_QBUF, &buf) == -1) {
-            std::cerr << "[VideoCapture] ❌ QBUF: " << strerror(errno) << std::endl;
+            std::cerr << "[VideoCapture] QBUF: " << strerror(errno) << std::endl;
             return false;
         }
     }

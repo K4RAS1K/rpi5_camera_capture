@@ -8,6 +8,7 @@ add_executable(camera_capture
     src/main.cpp
     src/VideoCapture.cpp
     src/CameraManager.cpp
+    src/WebServer.cpp
 )
 
 target_include_directories(camera_capture
@@ -17,6 +18,7 @@ target_include_directories(camera_capture
 
 target_link_libraries(camera_capture
     pthread
+    jpeg 
 )
 
 target_compile_options(camera_capture
@@ -26,5 +28,3 @@ target_compile_options(camera_capture
         -Wextra
         -pthread
 )
-
-message(STATUS "✅ Сборка: VideoCapture + CameraManager + WebServer")

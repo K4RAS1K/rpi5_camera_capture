@@ -1,5 +1,6 @@
 #pragma once
 #include "IVideoCapture.hpp"
+#include <cstdint>
 
 class VideoCapture : public IVideoCapture {
 public:
@@ -34,6 +35,7 @@ private:
     int width;
     int height;
     double fps;
+    uint32_t pixelFormat;
     unsigned int bufferCount;
     Buffer* buffers;
 };

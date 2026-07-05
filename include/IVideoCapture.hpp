@@ -4,7 +4,7 @@
 #include <cstdint>
 
 /**
- * @brief Структура для хранения кадра
+ * @brief Structure for storing a frame
  * 
  */
 struct FrameData {
@@ -28,7 +28,7 @@ struct FrameData {
 };
 
 /**
- * @brief Интерфейс захвата видео через V4L2
+ * @brief Video capture interface via V4L2
  * 
  */
 class IVideoCapture {
@@ -36,48 +36,48 @@ public:
     virtual ~IVideoCapture() = default;
     
     /**
-     * @brief Открыть устройство
-     * @param device Номер устройства (0, 1, 2...)
-     * @return true если успешно
+     * @brief Open the device
+     * @param device Device number (0, 1, 2...)
+     * @return true if successful
      */
     virtual bool open(int device) = 0;
     
     /**
-     * @brief Открыть устройство по пути
-     * @param path Путь к устройству (например, "/dev/video0")
-     * @return true если успешно
+     * @brief Open the device by path
+     * @param path Device path (e.g., "/dev/video0")
+     * @return true if successful
      */
     virtual bool open(const std::string& path) = 0;
     
     /**
-     * @brief Прочитать следующий кадр
-     * @param frame Выходной параметр: структура с данными
-     * @return true если кадр получен
+     * @brief Read the next frame
+     * @param frame Output parameter: structure with data
+     * @return true if frame was received
      */
     virtual bool read(FrameData& frame) = 0;
     
     /**
-     * @brief Проверить, открыто ли устройство
+     * @brief Check if the device is open
      */
     virtual bool isOpened() const = 0;
     
     /**
-     * @brief Получить ширину кадра
+     * @brief Get the frame width
      */
     virtual int getWidth() const = 0;
     
     /**
-     * @brief Получить высоту кадра
+     * @brief Get the frame height
      */
     virtual int getHeight() const = 0;
     
     /**
-     * @brief Получить FPS
+     * @brief Get the FPS
      */
     virtual double getFPS() const = 0;
     
     /**
-     * @brief Освободить ресурсы
+     * @brief Release resources
      */
     virtual void release() = 0;
 };

@@ -8,3 +8,6 @@ C++ приложение для отслеживания движения с USB
 - **MotionDetector** — детекция движения (MOG2)
 - **TelegramSender** — отправка уведомлений в Telegram
 - **CameraTracker** — оркестратор
+
+##Libs
+- **libjpeg**

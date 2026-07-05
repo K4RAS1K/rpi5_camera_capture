@@ -11,26 +11,26 @@ CameraManager::CameraManager(std::shared_ptr<IVideoCapture> capture)
       currentFPS(0.0), uptimeSeconds(0.0), lastFrameSize(0),
       frameCounter(0) {
     
-    std::cout << "[CameraManager] Создан" << std::endl;
+    std::cout << "[CameraManager] Created" << std::endl;
 }
 
 CameraManager::~CameraManager() {
     stop();
-    std::cout << "[CameraManager] Уничтожен" << std::endl;
+    std::cout << "[CameraManager] Destroyed" << std::endl;
 }
 
 bool CameraManager::start() {
     if (running) {
-        std::cout << "[CameraManager] Уже запущен" << std::endl;
+        std::cout << "[CameraManager] Already running" << std::endl;
         return true;
     }
     
     if (!capture->isOpened()) {
-        std::cerr << "[CameraManager] Камера не открыта!" << std::endl;
+        std::cerr << "[CameraManager] Camera is not open!" << std::endl;
         return false;
     }
     
-    // Сбрасываем состояние
+    // Reset state
     shouldStop = false;
     running = true;
     totalFrames = 0;
@@ -38,10 +38,10 @@ bool CameraManager::start() {
     startTime = std::chrono::steady_clock::now();
     lastFPSUpdate = startTime;
     
-    // Запускаем поток захвата
+    // Start capture thread
     captureThread = std::make_unique<std::thread>(&CameraManager::runLoop, this);
     
-    std::cout << "[CameraManager] Запущен" << std::endl;
+    std::cout << "[CameraManager] Started" << std::endl;
     return true;
 }
 
@@ -50,7 +50,7 @@ void CameraManager::stop() {
         return;
     }
     
-    std::cout << "[CameraManager] Остановка..." << std::endl;
+    std::cout << "[CameraManager] Stopping..." << std::endl;
     shouldStop = true;
     
     if (captureThread && captureThread->joinable()) {
@@ -58,11 +58,11 @@ void CameraManager::stop() {
     }
     
     running = false;
-    std::cout << "[CameraManager] Остановлен" << std::endl;
+    std::cout << "[CameraManager] Stopped" << std::endl;
 }
 
 void CameraManager::runLoop() {
-    std::cout << "[CameraManager] Цикл захвата начат" << std::endl;
+    std::cout << "[CameraManager] Capture loop started" << std::endl;
     
     FrameData frame;
     
@@ -89,7 +89,7 @@ void CameraManager::runLoop() {
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }
     
-    std::cout << "[CameraManager] Цикл захвата завершён" << std::endl;
+    std::cout << "[CameraManager] Capture loop finished" << std::endl;
 }
 
 void CameraManager::updateStats(const FrameData& frame) {

@@ -1,5 +1,6 @@
 #include "../include/VideoCapture.hpp"
 #include "../include/CameraManager.hpp"
+#include "../include/WebServer.hpp"
 #include <iostream>
 #include <memory>
 #include <signal.h>
@@ -16,56 +17,61 @@ void signalHandler(int signal) {
 int main(int argc, char* argv[]) {
     signal(SIGINT, signalHandler);
     signal(SIGTERM, signalHandler);
+
+    int deviceId = 0;
+    int webPort = 8080;
     
-    int deviceId = (argc > 1) ? std::stoi(argv[1]) : 0;
+    for (int i = 1; i < argc; i++) {
+        std::string arg = argv[i];
+        if (arg == "--device" && i + 1 < argc) {
+            deviceId = std::stoi(argv[++i]);
+        } else if (arg == "--port" && i + 1 < argc) {
+            webPort = std::stoi(argv[++i]);
+        } else if (arg == "--help" || arg == "-h") {
+            std::cout << "Usage: " << argv[0] << " [options]" << std::endl;
+            std::cout << "  --device N   Use /dev/videoN (default: 0)" << std::endl;
+            std::cout << "  --port N     Web server port (default: 8080)" << std::endl;
+            return 0;
+        }
+    }
     
     try {
         // 1. Создаём захват видео
         auto capture = std::make_shared<VideoCapture>();
         
         if (!capture->open(deviceId)) {
-            std::cerr << "Не удалось открыть камеру /dev/video" << deviceId << std::endl;
+            std::cerr << "Error /dev/video" << deviceId << std::endl;
             return 1;
         }
         
-        std::cout << "\nИнформация о камере:" << std::endl;
-        std::cout << "   Ширина: " << capture->getWidth() << std::endl;
-        std::cout << "   Высота: " << capture->getHeight() << std::endl;
-        std::cout << "   FPS: " << capture->getFPS() << std::endl;
-        
-        // 2. Создаём оркестратор
         auto manager = std::make_shared<CameraManager>(capture);
         
-        // 3. Запускаем захват
+        auto webServer = std::make_shared<WebServer>(webPort, manager);
+        
         if (!manager->start()) {
-            std::cerr << "Не удалось запустить захват" << std::endl;
+            std::cerr << " Error" << std::endl;
             return 1;
         }
         
-        while (running) {
-            std::this_thread::sleep_for(std::chrono::seconds(5));
-            
-            auto status = manager->getStatus();
-            auto stats = manager->getStats();
-            
-            std::cout << "\nСтатус:" << std::endl;
-            std::cout << "   Состояние: " << (status.isRunning ? "🟢 Запущена" : "🔴 Остановлена") << std::endl;
-            std::cout << "   Размер: " << status.width << "x" << status.height << std::endl;
-            std::cout << "   FPS: " << stats.currentFPS << std::endl;
-            std::cout << "   Кадров: " << stats.totalFrames << std::endl;
-            std::cout << "   Время работы: " << stats.uptimeSeconds << " сек" << std::endl;
-            std::cout << "   Последний кадр: " << status.lastFrameTime << std::endl;
-        }
+        webServer->start();
+    
+        std::cout << "/dev/video" << deviceId << std::endl;
+        std::cout << "" << capture->getWidth() << "x" << capture->getHeight() << std::endl;
+        std::cout << " Web: http://localhost:" << webPort << std::endl;
         
-        // 5. Остановка
-        std::cout << "\nОстановка..." << std::endl;
+        while (running) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+
+        std::cout << "\n Stop..." << std::endl;
+        webServer->stop();
         manager->stop();
         capture->release();
         
-        std::cout << "Завершено" << std::endl;
+        std::cout << "Stoped" << std::endl;
         
     } catch (const std::exception& e) {
-        std::cerr << "Ошибка: " << e.what() << std::endl;
+        std::cerr << "Error: " << e.what() << std::endl;
         return 1;
     }
     

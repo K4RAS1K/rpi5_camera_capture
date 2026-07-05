@@ -7,7 +7,7 @@
 #include "IVideoCapture.hpp"
 
 /**
- * @brief Информация о текущем состоянии
+ * @brief Current state information
  */
 struct CameraStatus {
     bool isRunning;
@@ -24,13 +24,13 @@ struct CameraStatus {
 };
 
 /**
- * @brief Оркестратор — управляет захватом видео
+ * @brief Orchestrator — manages video capture
  * 
- * Ответственности:
- * - Запуск/остановка цикла захвата
- * - Хранение последнего кадра
- * - Предоставление статуса
- * - Управление потоками
+ * Responsibilities:
+ * - Start/stop the capture loop
+ * - Store the last frame
+ * - Provide status information
+ * - Manage threads
  */
 class CameraManager {
 public:
@@ -38,34 +38,34 @@ public:
     ~CameraManager();
     
     /**
-     * @brief Запустить захват (в отдельном потоке)
+     * @brief Start capture (in a separate thread)
      */
     bool start();
     
     /**
-     * @brief Остановить захват
+     * @brief Stop capture
      */
     void stop();
     
     /**
-     * @brief Проверить, запущен ли захват
+     * @brief Check if capture is running
      */
     bool isRunning() const { return running; }
     
     /**
-     * @brief Получить последний кадр
-     * @param data Выходной буфер с данными кадра
-     * @return true если кадр доступен
+     * @brief Get the last frame
+     * @param data Output buffer with frame data
+     * @return true if frame is available
      */
     bool getLastFrame(std::vector<uint8_t>& data, int& width, int& height);
     
     /**
-     * @brief Получить статус камеры
+     * @brief Get camera status
      */
     CameraStatus getStatus() const;
     
     /**
-     * @brief Получить статистику
+     * @brief Get statistics
      */
     struct Stats {
         int totalFrames;
@@ -77,17 +77,17 @@ public:
 
 private:
     /**
-     * @brief Главный цикл захвата (запускается в потоке)
+     * @brief Main capture loop (runs in a thread)
      */
     void runLoop();
     
     /**
-     * @brief Обновить статистику
+     * @brief Update statistics
      */
     void updateStats(const FrameData& frame);
     
     /**
-     * @brief Получить текущее время как строку
+     * @brief Get current time as a string
      */
     std::string getCurrentTime() const;
 
